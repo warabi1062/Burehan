@@ -9,7 +9,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -76,6 +79,7 @@ fun BurehanApp(viewModel: MainViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
     val isSelecting = state.selectedUris.isNotEmpty()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var previewUri by remember { mutableStateOf<Uri?>(null) }
 
     val folderPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -123,6 +127,7 @@ fun BurehanApp(viewModel: MainViewModel = viewModel()) {
                     photos = state.photos,
                     selectedUris = state.selectedUris,
                     onToggleSelection = { viewModel.toggleSelection(it) },
+                    onLongPress = { previewUri = it },
                 )
             }
         }
@@ -137,6 +142,10 @@ fun BurehanApp(viewModel: MainViewModel = viewModel()) {
             },
             onDismiss = { showDeleteDialog = false },
         )
+    }
+
+    previewUri?.let { uri ->
+        FullScreenPreview(uri = uri, onDismiss = { previewUri = null })
     }
 }
 
@@ -201,9 +210,10 @@ private fun PhotoGrid(
     photos: List<PhotoItem>,
     selectedUris: Set<Uri>,
     onToggleSelection: (Uri) -> Unit,
+    onLongPress: (Uri) -> Unit,
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
+        columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -213,13 +223,15 @@ private fun PhotoGrid(
                 photo = photo,
                 isSelected = photo.uri in selectedUris,
                 onToggle = { onToggleSelection(photo.uri) },
+                onLongPress = { onLongPress(photo.uri) },
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PhotoThumbnail(photo: PhotoItem, isSelected: Boolean, onToggle: () -> Unit) {
+private fun PhotoThumbnail(photo: PhotoItem, isSelected: Boolean, onToggle: () -> Unit, onLongPress: () -> Unit) {
     Box(
         modifier = Modifier
             .aspectRatio(1f)
@@ -228,12 +240,12 @@ private fun PhotoThumbnail(photo: PhotoItem, isSelected: Boolean, onToggle: () -
                 if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
                 else Modifier
             )
-            .clickable { onToggle() },
+            .combinedClickable(onClick = onToggle, onLongClick = onLongPress),
     ) {
         AsyncImage(
             model = photo.uri,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
         if (isSelected) {
@@ -275,6 +287,26 @@ private fun PhotoThumbnail(photo: PhotoItem, isSelected: Boolean, onToggle: () -
                 )
                 .padding(horizontal = 6.dp, vertical = 2.dp),
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FullScreenPreview(uri: Uri, onDismiss: () -> Unit) {
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = uri,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
