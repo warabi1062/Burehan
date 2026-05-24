@@ -40,8 +40,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val results = mutableListOf<PhotoItem>()
             for ((index, entry) in entries.withIndex()) {
-                val score = withContext(Dispatchers.IO) { analyzer.analyze(entry.uri) }
-                results.add(PhotoItem(entry.uri, score))
+                val result = withContext(Dispatchers.IO) { analyzer.analyze(entry.uri) }
+                results.add(PhotoItem(entry.uri, result.score, result.variance, result.mse))
                 _state.value = _state.value.copy(
                     photos = results.toList(),
                     scannedCount = index + 1,

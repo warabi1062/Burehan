@@ -248,6 +248,19 @@ private fun PhotoThumbnail(photo: PhotoItem, isSelected: Boolean, onToggle: () -
                     .background(Color.White, CircleShape),
             )
         }
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(2.dp)
+                .background(
+                    color = Color.Black.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(4.dp),
+                )
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+        ) {
+            Text("V:${"%.0f".format(photo.variance)}", color = Color.White, fontSize = 9.sp)
+            Text("D:${"%.0f".format(photo.mse)}", color = Color.White, fontSize = 9.sp)
+        }
         Text(
             text = "${photo.score}",
             color = Color.White,

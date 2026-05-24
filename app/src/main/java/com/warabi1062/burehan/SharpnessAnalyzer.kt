@@ -4,19 +4,23 @@ import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDouble
+import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import kotlin.math.exp
 
 class SharpnessAnalyzer(private val contentResolver: ContentResolver) {
 
-    fun analyze(uri: Uri): Int {
-        val bitmap = decodeBitmap(uri) ?: return 0
-        val score = computeSharpnessScore(bitmap)
+    data class Result(val score: Int, val variance: Double, val mse: Double)
+
+    fun analyze(uri: Uri): Result {
+        val bitmap = decodeBitmap(uri) ?: return Result(0, 0.0, 0.0)
+        val result = computeSharpnessScore(bitmap)
         bitmap.recycle()
-        return score
+        return result
     }
 
     private fun decodeBitmap(uri: Uri): Bitmap? {
@@ -42,7 +46,7 @@ class SharpnessAnalyzer(private val contentResolver: ContentResolver) {
         return resized
     }
 
-    private fun computeSharpnessScore(bitmap: Bitmap): Int {
+    private fun computeSharpnessScore(bitmap: Bitmap): Result {
         val mat = Mat(bitmap.height, bitmap.width, CvType.CV_8UC4)
         org.opencv.android.Utils.bitmapToMat(bitmap, mat)
 
@@ -50,25 +54,48 @@ class SharpnessAnalyzer(private val contentResolver: ContentResolver) {
         Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGBA2GRAY)
         mat.release()
 
+        val variance = computeLaplacianVariance(gray)
+
+        val blurred = Mat()
+        Imgproc.GaussianBlur(gray, blurred, Size(7.0, 7.0), 0.0)
+
+        val grayF = Mat()
+        val blurredF = Mat()
+        gray.convertTo(grayF, CvType.CV_64F)
+        blurred.convertTo(blurredF, CvType.CV_64F)
+        gray.release()
+        blurred.release()
+
+        val diff = Mat()
+        Core.subtract(grayF, blurredF, diff)
+        grayF.release()
+        blurredF.release()
+
+        val diffSq = Mat()
+        Core.multiply(diff, diff, diffSq)
+        diff.release()
+
+        val mse = Core.mean(diffSq).`val`[0]
+        diffSq.release()
+
+        // midpoint=175, steepness=0.03
+        val score = 100.0 / (1.0 + exp(-0.03 * (mse - 175.0)))
+        return Result(score.toInt().coerceIn(0, 100), variance, mse)
+    }
+
+    private fun computeLaplacianVariance(gray: Mat): Double {
         val laplacian = Mat()
         Imgproc.Laplacian(gray, laplacian, CvType.CV_64F)
-        gray.release()
 
         val mean = MatOfDouble()
         val stddev = MatOfDouble()
-        org.opencv.core.Core.meanStdDev(laplacian, mean, stddev)
+        Core.meanStdDev(laplacian, mean, stddev)
         laplacian.release()
 
         val variance = stddev.get(0, 0)[0].let { it * it }
         mean.release()
         stddev.release()
 
-        return varianceToScore(variance)
-    }
-
-    private fun varianceToScore(variance: Double): Int {
-        // Sigmoid mapping: midpoint=500, steepness=0.008
-        val score = 100.0 / (1.0 + exp(-0.008 * (variance - 500.0)))
-        return score.toInt().coerceIn(0, 100)
+        return variance
     }
 }
