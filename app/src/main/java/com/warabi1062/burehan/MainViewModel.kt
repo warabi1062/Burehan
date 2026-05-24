@@ -40,7 +40,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val score = withContext(Dispatchers.IO) { analyzer.analyze(uri) }
                 results.add(PhotoItem(uri, score))
                 _state.value = _state.value.copy(
-                    photos = results.sortedBy { it.score }.toList(),
+                    photos = results.toList(),
                     scannedCount = index + 1,
                 )
             }
