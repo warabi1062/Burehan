@@ -1,6 +1,5 @@
 package com.warabi1062.burehan
 
-import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,12 +26,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,16 +58,13 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun BurehanApp(viewModel: MainViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
-    var hasPermission by remember { mutableStateOf(false) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasPermission = granted
-    }
-
-    LaunchedEffect(Unit) {
-        permissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.startScan(uri)
+        }
     }
 
     Scaffold(
@@ -85,54 +77,32 @@ fun BurehanApp(viewModel: MainViewModel = viewModel()) {
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            if (!hasPermission) {
-                PermissionRequest { permissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES) }
+            if (state.isScanning) {
+                ScanProgress(state.scannedCount, state.totalCount)
+            }
+            if (state.photos.isEmpty() && !state.isScanning) {
+                FolderSelectPrompt { folderPickerLauncher.launch(null) }
             } else {
-                if (state.isScanning) {
-                    ScanProgress(state.scannedCount, state.totalCount)
-                }
-                if (state.photos.isEmpty() && !state.isScanning) {
-                    StartScanPrompt { viewModel.startScan() }
-                } else {
-                    PhotoGrid(state.photos)
-                }
+                PhotoGrid(state.photos)
             }
         }
     }
 }
 
 @Composable
-private fun PermissionRequest(onRequest: () -> Unit) {
+private fun FolderSelectPrompt(onSelect: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            "写真へのアクセス権限が必要です",
+            "スキャンするフォルダを選択してください",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(bottom = 16.dp),
         )
-        Button(onClick = onRequest) {
-            Text("権限を許可する")
-        }
-    }
-}
-
-@Composable
-private fun StartScanPrompt(onStart: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            "端末内の写真をスキャンして\nシャープネスを判定します",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(bottom = 16.dp),
-        )
-        Button(onClick = onStart) {
-            Text("スキャン開始")
+        Button(onClick = onSelect) {
+            Text("フォルダを選択")
         }
     }
 }

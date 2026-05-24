@@ -1,6 +1,7 @@
 package com.warabi1062.burehan
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +15,7 @@ data class ScanState(
     val isScanning: Boolean = false,
     val scannedCount: Int = 0,
     val totalCount: Int = 0,
+    val folderSelected: Boolean = false,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -24,12 +26,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = PhotoRepository(application.contentResolver)
     private val analyzer = SharpnessAnalyzer(application.contentResolver)
 
-    fun startScan() {
+    fun startScan(treeUri: Uri) {
         if (_state.value.isScanning) return
 
         viewModelScope.launch {
-            val uris = withContext(Dispatchers.IO) { repository.loadAllPhotoUris() }
-            _state.value = ScanState(isScanning = true, totalCount = uris.size)
+            _state.value = ScanState(isScanning = true, folderSelected = true)
+
+            val uris = withContext(Dispatchers.IO) { repository.loadPhotoUrisFromTree(treeUri) }
+            _state.value = _state.value.copy(totalCount = uris.size)
 
             val results = mutableListOf<PhotoItem>()
             for ((index, uri) in uris.withIndex()) {
