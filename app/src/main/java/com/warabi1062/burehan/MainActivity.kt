@@ -96,7 +96,7 @@ fun BurehanApp(viewModel: MainViewModel = viewModel()) {
                     if (isSelecting) {
                         Text("${state.selectedUris.size}件選択中")
                     } else {
-                        Text("ブレハン")
+                        Text("Burehan")
                     }
                 },
                 actions = {
