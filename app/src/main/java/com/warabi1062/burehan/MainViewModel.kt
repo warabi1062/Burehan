@@ -35,13 +35,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.value = ScanState(isScanning = true, folderSelected = true)
 
-            val uris = withContext(Dispatchers.IO) { repository.loadPhotoUrisFromTree(treeUri) }
-            _state.value = _state.value.copy(totalCount = uris.size)
+            val entries = withContext(Dispatchers.IO) { repository.loadPhotoEntriesFromTree(treeUri) }
+            _state.value = _state.value.copy(totalCount = entries.size)
 
             val results = mutableListOf<PhotoItem>()
-            for ((index, uri) in uris.withIndex()) {
-                val score = withContext(Dispatchers.IO) { analyzer.analyze(uri) }
-                results.add(PhotoItem(uri, score))
+            for ((index, entry) in entries.withIndex()) {
+                val score = withContext(Dispatchers.IO) { analyzer.analyze(entry.uri) }
+                results.add(PhotoItem(entry.uri, score, entry.dateTaken))
                 _state.value = _state.value.copy(
                     photos = results.toList(),
                     scannedCount = index + 1,
