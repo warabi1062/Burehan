@@ -7,6 +7,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,20 +16,33 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +73,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun BurehanApp(viewModel: MainViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+    val isSelecting = state.selectedUris.isNotEmpty()
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     val folderPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -69,7 +86,25 @@ fun BurehanApp(viewModel: MainViewModel = viewModel()) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("ブレハン") })
+            TopAppBar(
+                title = {
+                    if (isSelecting) {
+                        Text("${state.selectedUris.size}件選択中")
+                    } else {
+                        Text("ブレハン")
+                    }
+                },
+                actions = {
+                    if (isSelecting) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "削除")
+                        }
+                        IconButton(onClick = { viewModel.clearSelection() }) {
+                            Icon(Icons.Default.Close, contentDescription = "選択解除")
+                        }
+                    }
+                },
+            )
         },
     ) { innerPadding ->
         Column(
@@ -83,10 +118,44 @@ fun BurehanApp(viewModel: MainViewModel = viewModel()) {
             if (state.photos.isEmpty() && !state.isScanning) {
                 FolderSelectPrompt { folderPickerLauncher.launch(null) }
             } else {
-                PhotoGrid(state.photos)
+                PhotoGrid(
+                    photos = state.photos,
+                    selectedUris = state.selectedUris,
+                    onToggleSelection = { viewModel.toggleSelection(it) },
+                )
             }
         }
     }
+
+    if (showDeleteDialog) {
+        DeleteConfirmDialog(
+            count = state.selectedUris.size,
+            onConfirm = {
+                viewModel.deleteSelected()
+                showDeleteDialog = false
+            },
+            onDismiss = { showDeleteDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun DeleteConfirmDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("写真を削除") },
+        text = { Text("${count}件の写真を削除しますか？この操作は元に戻せません。") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("削除", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("キャンセル")
+            }
+        },
+    )
 }
 
 @Composable
@@ -127,7 +196,11 @@ private fun ScanProgress(scanned: Int, total: Int) {
 }
 
 @Composable
-private fun PhotoGrid(photos: List<PhotoItem>) {
+private fun PhotoGrid(
+    photos: List<PhotoItem>,
+    selectedUris: Set<android.net.Uri>,
+    onToggleSelection: (android.net.Uri) -> Unit,
+) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.fillMaxSize(),
@@ -135,17 +208,26 @@ private fun PhotoGrid(photos: List<PhotoItem>) {
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         items(photos, key = { it.uri.toString() }) { photo ->
-            PhotoThumbnail(photo)
+            PhotoThumbnail(
+                photo = photo,
+                isSelected = photo.uri in selectedUris,
+                onToggle = { onToggleSelection(photo.uri) },
+            )
         }
     }
 }
 
 @Composable
-private fun PhotoThumbnail(photo: PhotoItem) {
+private fun PhotoThumbnail(photo: PhotoItem, isSelected: Boolean, onToggle: () -> Unit) {
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(4.dp)),
+            .clip(RoundedCornerShape(4.dp))
+            .then(
+                if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
+                else Modifier
+            )
+            .clickable { onToggle() },
     ) {
         AsyncImage(
             model = photo.uri,
@@ -153,6 +235,18 @@ private fun PhotoThumbnail(photo: PhotoItem) {
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
+        if (isSelected) {
+            Icon(
+                Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(4.dp)
+                    .size(24.dp)
+                    .background(Color.White, CircleShape),
+            )
+        }
         Text(
             text = "${photo.score}",
             color = Color.White,
