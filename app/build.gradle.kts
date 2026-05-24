@@ -50,7 +50,6 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.exifinterface)
     implementation(libs.opencv)
     implementation(libs.coil.compose)
     testImplementation(libs.junit)

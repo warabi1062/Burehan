@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -57,9 +56,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.warabi1062.burehan.ui.theme.BurehanTheme
 import org.opencv.android.OpenCVLoader
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -200,40 +196,24 @@ private fun ScanProgress(scanned: Int, total: Int) {
     }
 }
 
-private val dateFormat = SimpleDateFormat("yyyy年M月d日", Locale.JAPAN)
-
-private fun formatDate(timestamp: Long): String = dateFormat.format(Date(timestamp))
-
 @Composable
 private fun PhotoGrid(
     photos: List<PhotoItem>,
     selectedUris: Set<Uri>,
     onToggleSelection: (Uri) -> Unit,
 ) {
-    val grouped = photos.groupBy { formatDate(it.dateTaken) }
-    val columns = 3
-
     LazyVerticalGrid(
-        columns = GridCells.Fixed(columns),
+        columns = GridCells.Fixed(3),
         modifier = Modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        for ((date, datePhotos) in grouped) {
-            item(key = "header_$date", span = { GridItemSpan(columns) }) {
-                Text(
-                    text = date,
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                )
-            }
-            items(datePhotos, key = { it.uri.toString() }) { photo ->
-                PhotoThumbnail(
-                    photo = photo,
-                    isSelected = photo.uri in selectedUris,
-                    onToggle = { onToggleSelection(photo.uri) },
-                )
-            }
+        items(photos, key = { it.uri.toString() }) { photo ->
+            PhotoThumbnail(
+                photo = photo,
+                isSelected = photo.uri in selectedUris,
+                onToggle = { onToggleSelection(photo.uri) },
+            )
         }
     }
 }
